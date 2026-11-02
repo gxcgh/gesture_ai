@@ -20,12 +20,13 @@ An end-to-end beginner-friendly project that teaches you how to connect an MPU60
 
 ### 3. Required Python Libraries
 
-Create a virtual environment to download python libraries without causing discrepancies using following commands:
+Create a virtual environment to download python libraries without causing discrepancies with global libraries using following commands:
 
 ```bash
 python -m venv tinyml
 tinyml/Scripts/activate
 ```
+
 Run the following command in your terminal or command prompt to install all necessary Python dependencies:
 
 ```bash
