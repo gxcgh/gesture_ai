@@ -1,55 +1,122 @@
-import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
-import emlearn
+import csv
+import os
+import time
+import serial
 
 # --- CONFIGURATION ---
+# Replace 'COM3' with your ESP32's actual COM port (e.g., '/dev/ttyUSB0' on Linux/Mac)
+PORT = "COM3"
+BAUD = 115200
 CSV_FILE = "gesture_dataset.csv"
-OUTPUT_HEADER = "gesture_model.h"
+
+
+def initialize_csv():
+  """Creates the CSV file with headers if it doesn't already exist."""
+  if not os.path.exists(CSV_FILE):
+    with open(CSV_FILE, mode="w", newline="") as f:
+      writer = csv.writer(f)
+      writer.writerow([
+          "ax",
+          "ay",
+          "az",
+          "gx",
+          "gy",
+          "gz",
+          "label",
+      ])
+    print(f"Created new dataset file: {CSV_FILE}")
+
 
 def main():
-    # 1. Load the dataset
-    print(f"Loading dataset from {CSV_FILE}...")
-    try:
-        df = pd.read_csv(CSV_FILE)
-    except FileNotFoundError:
-        print(f"Error: {CSV_FILE} not found. Run your data collection script first.")
-        return
+  initialize_csv()
 
-    print(f"Total samples loaded: {len(df)}")
-    print("Class distribution:")
-    print(df['label'].value_counts())
-    print("-" * 40)
-
-    # 2. Separate features (X) and target labels (y)
-    X = df[['ax', 'ay', 'az', 'gx', 'gy', 'gz']]
-    y = df['label']
-
-    # 3. Split data for validation
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+  try:
+    ser = serial.Serial(PORT, BAUD, timeout=1)
+    time.sleep(2)  # Allow ESP32 to reset and establish serial connection
+    print(f"Connected to ESP32 on {PORT} at {BAUD} baud.\n")
+  except Exception as e:
+    print(
+        f"Error connecting to port {PORT}. Please check your connection and"
+        f" port name.\nDetails: {e}"
     )
+    return
 
-    # 4. Train a compact Random Forest Classifier
-    # Keeping n_estimators and max_depth low ensures low memory footprint on the ESP32
-    print("Training RandomForest model...")
-    clf = RandomForestClassifier(n_estimators=10, max_depth=5, random_state=42)
-    clf.fit(X_train, y_train)
+  print("=" * 50)
+  print(" GESTURE DATA COLLECTION TOOL")
+  print("=" * 50)
+  print("Instructions:")
+  print("1. Type your target label (e.g., front, back, left, right)")
+  print("2. Press ENTER to start recording samples for that orientation.")
+  print("3. Hold the device steady in position while it records.")
+  print("4. Type 'q' or 'quit' to exit the program.\n")
 
-    # 5. Evaluate model performance
-    y_pred = clf.predict(X_test)
-    acc = accuracy_score(y_test, y_pred)
-    print(f"\nModel Validation Accuracy: {acc * 100:.2f}%\n")
-    print("Classification Report:")
-    print(classification_report(y_test, y_pred))
+  try:
+    while True:
+      label = input("Enter label for next recording (or 'q' to quit): ").strip()
 
-    # 6. Convert model to C using emlearn and save as header file
-    print(f"Converting model and exporting to {OUTPUT_HEADER}...")
-    cmodel = emlearn.convert(clf, method='inline')
-    cmodel.save(file=OUTPUT_HEADER)
-    
-    print(f"Success! '{OUTPUT_HEADER}' generated and ready for your Arduino sketch.")
+      if label.lower() in ["q", "quit"]:
+        print("Exiting data collection. Dataset saved to", CSV_FILE)
+        break
+
+      if not label:
+        print("Label cannot be empty. Try again.")
+        continue
+
+      try:
+        sample_count = int(
+            input(
+                f"How many samples do you want to collect for '{label}'? (e.g.,"
+                " 300): "
+            )
+        )
+      except ValueError:
+        print("Please enter a valid integer for sample count.")
+        continue
+
+      print(
+          f"\nGet ready! Recording {sample_count} samples for '{label}' in 2"
+          " seconds..."
+      )
+      time.sleep(2)
+      print("Recording started... Keep the device in position.")
+
+      collected = 0
+      with open(CSV_FILE, mode="a", newline="") as f:
+        writer = csv.writer(f)
+
+        # Clear any stale buffer data
+        ser.reset_input_buffer()
+
+        while collected < sample_count:
+          if ser.in_waiting > 0:
+            line = ser.readline().decode("utf-8", errors="ignore").strip()
+
+            # Expecting CSV line from ESP32: ax,ay,az,gx,gy,gz
+            parts = line.split(",")
+            if len(parts) == 6:
+              try:
+                # Convert to float/int to validate data integrity
+                row = [float(p) for p in parts]
+                row.append(label)  # Append the text label
+                writer.writerow(row)
+                collected += 1
+
+                # Print progress bar / indicator
+                if collected % 50 == 0:
+                  print(f"Collected {collected}/{sample_count} samples...")
+              except ValueError:
+                # Skip lines that fail float conversion (e.g., debug text)
+                continue
+
+      print(f"Successfully recorded {collected} samples for '{label}'!\n")
+
+  except KeyboardInterrupt:
+    print("\nCollection interrupted by user. Exiting safely.")
+  finally:
+    if ser.is_open:
+      ser.close()
+    print("Serial port closed.")
+
 
 if __name__ == "__main__":
-    main()
+  main()
