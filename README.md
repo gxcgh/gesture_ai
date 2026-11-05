@@ -39,8 +39,8 @@ pip install pyserial pandas scikit-learn emlearn
 
 Connect the MPU6050 to your ESP32 DevKit V1 using the I2C communication protocol:
 
-| MPU6050 Pin   | ESP32 DevKit V1 Pin     | Description                            |
-| :------------ | :---------------------- | :------------------------------------- |
+| MPU6050 Pin   | ESP32 DevKit V1 Pin     | Description                                 |
+| :------------ | :---------------------- | :------------------------------------------ |
 | **VCC** | **3.3V**          | Power supply (Connect to 3.3V, not 5V)      |
 | **GND** | **GND**           | Ground connection                           |
 | **SDA** | **GPIO 21 (D21)** | I2C Data line                               |

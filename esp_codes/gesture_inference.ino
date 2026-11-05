@@ -77,8 +77,11 @@ void loop() {
     filtered_gz = (alpha * raw_gz) + ((1.0 - alpha) * filtered_gz);
 
     // Package filtered features into the array
-    float features[6] = {filtered_ax, filtered_ay, filtered_az, filtered_gx, filtered_gy, filtered_gz};
-
+    //float features[6] = {filtered_ax, filtered_ay, filtered_az, filtered_gx, filtered_gy, filtered_gz};
+    int16_t features[6] = {
+      (int16_t)filtered_ax, (int16_t)filtered_ay, (int16_t)filtered_az,
+      (int16_t)filtered_gx, (int16_t)filtered_gy, (int16_t)filtered_gz
+    };
     // Run inference using the emlearn model function
     int predicted_class_idx = gesture_model_predict(features, 6);
 
